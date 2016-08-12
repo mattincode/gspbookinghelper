@@ -15,7 +15,7 @@ namespace gspbookinghelper.Controllers
     {
         // GET api/values
         [HttpGet]
-        public IEnumerable<Booking> Get()
+        public IEnumerable<Transaction> Get()
         {
             // *** Tool for finding double bookings by simple overlap-testing... running bookingengine can be done in a second iteration ***
             // Basic input (first page/settings)
@@ -28,25 +28,26 @@ namespace gspbookinghelper.Controllers
             string employeeNumber = "28635";
             DateTime periodStart = new DateTime(2016,1,1);
             DateTime periodEnd = new DateTime(2016,1,31);
+            IList<Booking> bookings = new List<Booking>();
 
             // Test dapper:
             string connection = "Data Source=securitassql;Initial Catalog=GSPSERef160613;Integrated Security=True";
             using (IDbConnection db = new SqlConnection(connection))
             {                    
                 var stringFormatter = new StringBuilder();
-                stringFormatter.Append($"Select e.EmployeeNumber, b.* from Booking b join Employee e on b.EmployeeId = e.EmployeeId");
+                stringFormatter.Append($"Select e.EmployeeNumber, e.FirstName, e.LastName, pc.ProfitCenterNumber, p.PlanningUnitNumber, b.*, DoubleBookingOnBookingId = 0 from Booking b");
+                stringFormatter.Append($" JOIN Employee e on b.EmployeeId = e.EmployeeId");
+                stringFormatter.Append($" LEFT JOIN PlanningUnit p on b.PlanningUnitId = p.PlanningUnitId");
+                stringFormatter.Append($" LEFT JOIN ProfitCenter pc on p.ProfitCenterId = pc.ProfitCenterId");
                 stringFormatter.Append($" WHERE e.EmployeeNumber = '{employeeNumber}'");
                 stringFormatter.Append($" AND ((b.StartDate >= '{periodStart}' AND b.StartDate < '{periodEnd}')"); // Get all bookings that starts in the period
                 stringFormatter.Append($"   OR (b.EndDate > '{periodStart}' AND b.EndDate <= '{periodEnd}')");  // Get all bookings that ends in the period
                 stringFormatter.Append($"   OR (b.StartDate < '{periodStart}' AND b.EndDate > '{periodEnd}'))"); // Get all bookings that overlaps the entire period                
-                var bookings = db.Query<Booking>(stringFormatter.ToString()).ToList();
-                // foreach (var booking in bookings)
-                // {
-                //     Console.WriteLine(booking.BookingId);    
-                // }                    
-                return  bookings;// new List<string>() { bookings.First().BookingId.ToString() };
+                bookings = db.Query<Booking>(stringFormatter.ToString()).ToList();
             }
-            //return new string[]{"nada"};
+            
+            var engine = new DoubleBookingEngine(bookings);
+            return engine.GetDoubleBookingHistory();
         }
 
         // GET api/values/5
