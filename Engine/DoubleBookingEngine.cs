@@ -38,16 +38,29 @@ namespace gspbookinghelper
                     {
                         foreach (var earlierBooking in earlierTransaction.Bookings)
                         {
-                            // Check overlap 
-                            if (booking.AbsenceTypeId != null)
+                            bool overlap = false;
+
+                            // Check overlap
+                            overlap = booking.HasOverlap(earlierBooking);
+                            // Special case, handle absencebookings with percentage < 100&
+                            if ((booking.AbsenceTypeId != null && booking.AbsencePercentage != null) ||
+                                (earlierBooking.AbsenceTypeId != null && earlierBooking.AbsencePercentage != null))
+                            {   
+                                // Allow overlap
+                                continue;
+                            }
+                            if (overlap)
                             {
-                                
+                                booking.DoubleBookingOnBookingId = earlierBooking.BookingId;
+                                newTransaction.HasDoubleBookings = true;
                             }
                         }
                     }
                 }
                                    
             }
+
+            //TODO: Get CreatedBy name
 
             return bookingHistory;
         }

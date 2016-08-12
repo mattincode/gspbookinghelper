@@ -32,4 +32,15 @@ namespace gspbookinghelper {
         public int DoubleBookingOnBookingId { get; set; }              
    }
 
+   public static class BookingExtensions
+   {
+       public static bool HasOverlap(this Booking booking, Booking otherBooking)
+       {
+           return ((booking.StartDate >= otherBooking.StartDate && booking.StartDate <= otherBooking.EndDate) || // StartDate within oterbooking start-end
+                    (booking.EndDate >= otherBooking.StartDate && booking.EndDate <= otherBooking.EndDate) ||    // EndDate within otherbooking start-end
+                    (booking.StartDate < otherBooking.StartDate && booking.EndDate > otherBooking.EndDate) ||    // Start and end-date overlaps entire otherbooking
+                    (otherBooking.StartDate < booking.StartDate && otherBooking.EndDate > booking.EndDate));
+       }
+   }
+
 }
