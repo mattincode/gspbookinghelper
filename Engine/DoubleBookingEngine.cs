@@ -4,6 +4,10 @@ using System.Linq;
 
 namespace gspbookinghelper
 {
+    public enum ScheduleType
+    {
+        Planned
+    }
     public class DoubleBookingEngine
     {
         IList<Booking> _bookings = new List<Booking>();
@@ -20,8 +24,10 @@ namespace gspbookinghelper
         public IList<Transaction> GetDoubleBookingHistory()
         {
             var bookingHistory = new List<Transaction>();
+            // Create a lookuptable where all bookings are grouped by changetrace.
+            var bookingsByChangeTraceId = _bookings.OrderBy(t => t.CreatedOn).GroupBy(b => b.ChangeTraceId).ToList();
             // Group bookings by transaction and order from oldest to newest transaction
-            var bookingsGroupedByTrans = _bookings.GroupBy(b => b.CreatedOn).OrderBy(c => c.Key);
+            var bookingsGroupedByTrans = _bookings.GroupBy(b => b.CreatedOn).OrderBy(c => c.Key);            
             foreach (var bookingTransaction in bookingsGroupedByTrans)
             {
                 var firstBooking = bookingTransaction.First();
@@ -30,10 +36,22 @@ namespace gspbookinghelper
                                                         CreatedById = firstBooking.CreatedBy,
                                                         Bookings = bookingTransaction.ToList()}; 
 
+                
+                // TODO: Group bookings before transaction date on changetraceid
+                // TODO: Handle deleted bookings
+                // TODO: Handle scheduled/non-scheduled
+                // TODO: Write testcases      
+                // TODO: Get locked workschedule versions                          
+
                 // Now. Let's iterate every booking in the added transaction and check if there is overlap with any bookings in the previous transactions
-                var earlierTransactions = bookingHistory.Where(t => t.TransactionDate != firstBooking.CreatedOn);
+                var earlierTransactions = bookingHistory.Where(t => t.TransactionDate != firstBooking.CreatedOn);                
                 foreach (var booking in newTransaction.Bookings)
-                {
+                {   
+                    // A deleted booking can never overlap                 
+                    if (booking.IsDeleted) continue;
+
+                    // TODO: Get all overlapping bookings
+
                     foreach (var earlierTransaction in earlierTransactions)
                     {
                         foreach (var earlierBooking in earlierTransaction.Bookings)
@@ -57,6 +75,8 @@ namespace gspbookinghelper
                         }
                     }
                 }
+
+                bookingHistory.Add(newTransaction);
                                    
             }
 
