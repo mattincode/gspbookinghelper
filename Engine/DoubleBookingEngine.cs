@@ -24,8 +24,6 @@ namespace gspbookinghelper
         public IList<Transaction> GetDoubleBookingHistory()
         {
             var bookingHistory = new List<Transaction>();
-            // Create a lookuptable where all bookings are grouped by changetrace.
-            var bookingsByChangeTraceId = _bookings.OrderBy(t => t.CreatedOn).GroupBy(b => b.ChangeTraceId).ToList();
             // Group bookings by transaction and order from oldest to newest transaction
             var bookingsGroupedByTrans = _bookings.GroupBy(b => b.CreatedOn).OrderBy(c => c.Key);            
             foreach (var bookingTransaction in bookingsGroupedByTrans)
@@ -41,7 +39,10 @@ namespace gspbookinghelper
                 // TODO: Handle deleted bookings
                 // TODO: Handle scheduled/non-scheduled
                 // TODO: Write testcases      
-                // TODO: Get locked workschedule versions                          
+                // TODO: Get locked workschedule versions                     
+
+                // Create a lookuptable where all before this transaction are grouped by changetrace.
+                var bookingsByChangeTraceId = _bookings.Where(t => t.CreatedOn < newTransaction.TransactionDate).OrderBy(t => t.CreatedOn).GroupBy(b => b.ChangeTraceId).ToList();
 
                 // Now. Let's iterate every booking in the added transaction and check if there is overlap with any bookings in the previous transactions
                 var earlierTransactions = bookingHistory.Where(t => t.TransactionDate != firstBooking.CreatedOn);                
@@ -50,29 +51,21 @@ namespace gspbookinghelper
                     // A deleted booking can never overlap                 
                     if (booking.IsDeleted) continue;
 
-                    // TODO: Get all overlapping bookings
-
-                    foreach (var earlierTransaction in earlierTransactions)
+                    foreach (var oldBookingChangetraceGroup in bookingsByChangeTraceId)
                     {
-                        foreach (var earlierBooking in earlierTransaction.Bookings)
+                        var overlappingBookings = oldBookingChangetraceGroup.Where(b => b.HasOverlap(booking));
+                        foreach (var overlappingBooking in overlappingBookings)
                         {
-                            bool overlap = false;
-
-                            // Check overlap
-                            overlap = booking.HasOverlap(earlierBooking);
                             // Special case, handle absencebookings with percentage < 100&
                             if ((booking.AbsenceTypeId != null && booking.AbsencePercentage != null) ||
-                                (earlierBooking.AbsenceTypeId != null && earlierBooking.AbsencePercentage != null))
+                                (overlappingBooking.AbsenceTypeId != null && overlappingBooking.AbsencePercentage != null))
                             {   
                                 // Allow overlap
                                 continue;
                             }
-                            if (overlap)
-                            {
-                                booking.DoubleBookingOnBookingId = earlierBooking.BookingId;
-                                newTransaction.HasDoubleBookings = true;
-                            }
-                        }
+                            booking.DoubleBookingOnBookingId = overlappingBooking.BookingId;
+                            newTransaction.HasDoubleBookings = true;
+                        }                    
                     }
                 }
 
